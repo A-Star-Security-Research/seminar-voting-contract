@@ -1,0 +1,1 @@
+# seminar-voting-contract
