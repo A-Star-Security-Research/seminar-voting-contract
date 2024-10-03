@@ -74,15 +74,6 @@ contract SeminarVoting is Ownable, Lib_AddressResolver {
 
     }
 
-    // function setSeminarCertificateIdsToAddress(uint256 _id, string memory _bestSeminars) external onlyOwner() {
-    //     string memory a = "1" + string(1);
-    //     bestSeminars = IBestArwards(_bestSeminars);
-    // }
-
-    // function setBestSpeakerArwardsContract(address _bestSpeaker) external onlyOwner() {
-    //     bestSpeakers = IBestArwards(_bestSpeaker);
-    // }
-
     // Hàm để tạo một vòng bầu chọn mới
     function createRound(uint256 _votingStart, uint256 _votingDuration, uint256 _maxVotes) public onlyOwner {
         uint256 roundId = rounds.length;
@@ -106,23 +97,6 @@ contract SeminarVoting is Ownable, Lib_AddressResolver {
         round.seminars.push(Seminar(_id, _title, _speakers, _slideLink));
         emit SeminarAdded(_id, currentRoundId, _title, _speakers, _slideLink);
     }
-
-    // // Hàm để thiết lập tên cho người vote
-    // function setVoterName(string memory _name) public {
-    //     Round storage round = rounds[currentRoundId];
-    //     require(round.seminarVotes[msg.sender] != 0, "You have already voted for seminars in this round");
-    //     require(round.speakerVotes[msg.sender] != 0, "You have already voted for speakers in this round");
-        
-    //     round.voterNames[msg.sender] = _name;
-    // }
-
-    // // Hàm để sửa tên của người vote
-    // function updateVoterName(string memory _newName) public {
-    //     Round storage round = rounds[currentRoundId];
-    //     require(bytes(round.voterNames[msg.sender]).length != 0, "Voter name is not set");
-    //     round.voterNames[msg.sender] = _newName;
-    //     emit VoterNameUpdated(msg.sender, _newName);
-    // }
 
     // Hàm để lấy danh sách các tên người đã vote cho seminar
     function geSeminarVoters() public view returns (address[] memory) {
@@ -182,40 +156,65 @@ contract SeminarVoting is Ownable, Lib_AddressResolver {
     }
 
     // Hàm để xem số vote cho mỗi seminar sau khi kết thúc vote
-    function getSeminarVotes() public view returns (uint256[] memory) {
-        Round storage round = rounds[currentRoundId];
+    function getSeminarVotesByRoundId(uint256 _roundId) public view returns (uint256[] memory seminarIds, uint256[] memory votes) {
+        Round storage round = rounds[_roundId];
         require(round.votingEnded, "Voting has not ended yet");
 
-        uint256[] memory votes = new uint256[](round.seminars.length);
+        votes = new uint256[](round.seminars.length);
+        seminarIds = new uint256[](round.seminars.length);
         for (uint256 i = 0; i < round.seminars.length; i++) {
             votes[i] = round.seminarVoteCount[round.seminars[i].id];
+            seminarIds[i] = round.seminars[i].id;
         }
-        return votes;
     }
 
     // Hàm để xem số vote cho mỗi diễn giả sau khi kết thúc vote
-    function getSpeakerVotes() public view returns (uint256[] memory) {
-        Round storage round = rounds[currentRoundId];
+    function getSpeakerVotesByRoundId(uint256 _roundId) public view returns (address[] memory speakers, uint256[] memory votes)  {
+        Round storage round = rounds[_roundId];
         require(round.votingEnded, "Voting has not ended yet");
 
-        uint256[] memory votes = new uint256[](round.seminars.length);
+        votes = new uint256[](round.seminars.length);
+        speakers = new address[](round.seminars.length);
         for (uint256 i = 0; i < round.seminars.length; i++) {
-            votes[i] = round.speakerVoteCount[round.seminars[i].speakers[i]];
+            for(uint256 j = 0; j < round.seminars[i].speakers.length; j++) {
+                votes[i] = round.speakerVoteCount[round.seminars[i].speakers[i]];
+                speakers[i] = round.seminars[i].speakers[i];
+            }
         }
-        return votes;
     }
 
-    // Hàm để xem danh sách diễn giả trong vòng bầu chọn hiện tại
-    function getSpeakers() public view returns (address[][] memory) {
-        Round storage round = rounds[currentRoundId];
-        // Assuming you have the number of seminars in round.seminars.length
-        address[][] memory speakers = new address[][](round.seminars.length);
+    // Hàm để xem 3 diễn giả có số phiếu cao nhất
+    function getWinnerSpeakersByRoundId(uint256 _roundId) public view returns (address[] memory topSpeakers, uint256[] memory topVotes) {
+        Round storage round = rounds[_roundId];
+        require(round.votingEnded, "Voting has not ended yet");
 
+        // Tạo mảng để lưu các speaker và số phiếu của họ
+        (address[] memory allSpeakers, uint256[] memory allVotes ) = getSpeakerVotesByRoundId(_roundId);
 
-        for (uint256 i = 0; i < round.seminars.length; i++) {
-            speakers[i] = round.seminars[i].speakers;
+    
+
+        // Tìm top 3 speakers có số phiếu cao nhất
+        for (uint256 i = 0; i < speakerCount; i++) {
+            for (uint256 j = i + 1; j < speakerCount; j++) {
+                if (allVotes[j] > allVotes[i]) {
+                    // Đổi chỗ votes
+                    uint256 tempVotes = allVotes[i];
+                    allVotes[i] = allVotes[j];
+                    allVotes[j] = tempVotes;
+
+                    // Đổi chỗ speakers
+                    address tempSpeaker = allSpeakers[i];
+                    allSpeakers[i] = allSpeakers[j];
+                    allSpeakers[j] = tempSpeaker;
+                }
+            }
         }
-        return speakers;
+
+        // Lấy top 3 speakers
+        for (uint256 k = 0; k < 3 && k < speakerCount; k++) {
+            topSpeakers[k] = allSpeakers[k];
+            topVotes[k] = allVotes[k];
+        }
     }
 
     // Hàm để xem danh sách diễn giả cho một round cụ thể
@@ -283,18 +282,7 @@ contract SeminarVoting is Ownable, Lib_AddressResolver {
         require(block.timestamp >= round.votingDeadline, "Voting is not ended yet");
         require(!round.votingEnded, "Voting has already ended");
 
-        // Tìm seminar có số phiếu bầu cao nhất
-        uint256 bestSeminarId = 0;
-        uint256 maxSeminarVotes = 0;
-        for (uint256 i = 0; i < round.seminars.length; i++) {
-            if (round.seminarVoteCount[round.seminars[i].id] > maxSeminarVotes) {
-                maxSeminarVotes = round.seminarVoteCount[round.seminars[i].id];
-                bestSeminarId = i;
-            }
-        }
-
-        uint256[] memory seminarIdWinners = new uint256[](round.maxVotes);
-        seminarIdWinners[0] = bestSeminarId;
+        (uint256[] memory seminarIdWinners, ) = getSeminarVotesByRoundId(currentRoundId);
 
         for(uint256 i = 0; i < round.maxVotes; i++) {
             // Mint NFT cho tất cả diễn giả của seminar chiến thắng
