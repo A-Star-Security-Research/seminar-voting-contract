@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "./interfaces/IBestArwards.sol";
+import "./interfaces/IBestAwards.sol";
 import "./libraries/Lib_AddressResolver.sol";
 
 contract SeminarVoting is Ownable, Lib_AddressResolver {
@@ -290,7 +290,7 @@ contract SeminarVoting is Ownable, Lib_AddressResolver {
             for (uint256 j = 0; j < bestSeminar.speakers.length; j++) {
                 address speaker = bestSeminar.speakers[j];
                 if (speaker != address(0)) {
-                    uint256 tokenId = IBestArwards(resolve("SpeakerRewards")).mintNFT(speaker, seminarIdWinners[i], currentRoundId);
+                    uint256 tokenId = IBestAwards(resolve("SpeakerRewards")).mintNFT(speaker, seminarIdWinners[i], currentRoundId);
                     emit BestSpeakersNFTMinted(speaker, tokenId);
                 }
             }
